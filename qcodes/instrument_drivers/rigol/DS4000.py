@@ -1,5 +1,3 @@
-import logging
-import binascii
 
 import numpy as np
 from pyvisa.errors import VisaIOError
@@ -8,17 +6,110 @@ from functools import partial
 from qcodes import VisaInstrument, validators as vals
 from qcodes import InstrumentChannel, ChannelList
 from qcodes import ArrayParameter
+from qcodes.instrument.channel import InstrumentChannel, ChannelList
 
-log = logging.getLogger(__name__)
+from collections import namedtuple
+
+#TODO: convert call to long version
 
 
-class TraceNotReady(Exception):
-    pass
+class ScopeArray(ArrayParameter):
+    def __init__(self, name, instrument, channel, raw=False):
+        super().__init__(name=name,
+                         shape=(1400,),
+                         label='Voltage',
+                         unit='V',
+                         setpoint_names=('Time', ),
+                         setpoint_labels=('Time', ),
+                         setpoint_units=('s',),
+                         docstring='holds an array from scope')
+        self.channel = channel
+        self._instrument = instrument
+        self.raw = raw
+        self.max_read_step = 10
 
+    def get(self):
+        self.write(':WAV:FORM BYTE')                         # Set the data type for waveforms to "BYTE"
+        self.write(':WAV:SOUR CHAN{}'.format(self.channel))  # Set read channel
+
+        data_bin = b''
+        if self.raw:
+            self._instrument.stop()      # Stop acquisition
+            self.write(':WAV:MODE RAW')  # Set RAW mode
+            self.write(':WAV:RES')       # Resets the waveform data reading
+            self.write(':WAV:BEG')       # Starts the waveform data reading
+
+            for _ in range(self.max_read_step):
+                status = self.ask(':WAV:STAT?').split(',')[0]
+                self.write(':WAV:DATA?')
+                data_bin += self.visa_handle.read_raw()
+
+                if status == 'IDLE':
+                    self.write(':WAV:END')
+                    break
+            else:
+                raise ValueError('Communication error')
+
+        else:
+            self.write(':WAV:MODE NORM')  # Set normal mode
+            self.write(':WAV:DATA?')  # Query data
+            data_bin += self.visa_handle.read_raw()
+
+        # Convert data to byte array
+        data_bin = data_bin[11:]  # Strip header
+        data_bin = data_bin.strip()  # Strip \n
+        data_raw = np.fromstring(data_bin, dtype=np.uint8)  # Convert to an array
+
+        # Convert byte array to real data
+        p = self.get_preamble()
+        data = (data_raw - p.yreference - p.yorigin) * p.yincrement
+
+        # Generate time axis data
+        xdata = np.linspace(p.xorigin, p.origin + p.xincrement * p.points, p.points)
+        self.setpoints = (tuple(xdata),)
+        self.shape = (p.points,)
+
+        return data, xincrement
+
+    def get_preamble(self):
+        preamble_nt = namedtuple('preamble', ["format", "mode", "points", "count", "xincrement", "xorigin",
+                                              "xreference", "yincrement", "yorigin", "yreference"])
+        conv = lambda x: int(x) if x.isdigit() else float(x)
+
+        preamble_raw = self.ask(':WAV:PRE?')
+        preamble_num = [conv(x) for x in preamble_raw.strip().split(',')]
+        preamble = preamble_nt(*preamble_num)
+
+        return preamble
+
+
+class RigolDS4000Channel(InstrumentChannel):
+
+    def __init__(self, parent, name, channel):
+        super().__init__(parent, name)
+
+        self.add_parameter("amplitude",
+                           get_cmd=":meas:vamp? chan{}".format(channel)
+                          )
+        self.add_parameter("vertical_scale",
+                           get_cmd="chan{}:scale?".format(channel),
+                           set_cmd="chan{}:scale ".format(channel) + "{}",
+                           get_parser=float
+                          )
+        self.add_parameter('curvedata',
+                           channel=channel,
+                           parameter_class=ScopeArray,
+                           raw=False
+                           )
+        self.add_parameter('curvedata_raw',
+                           channel=channel,
+                           parameter_class=ScopeArray,
+                           raw=True
+                           )
 
 class DS4000(VisaInstrument):
     """
-    This is the QCoDeS driver for the Rigol DS4000 serie oscilloscopes.
+    This is the QCoDeS driver for the Rigol DS4000 series oscilloscopes.
     """
 
     def __init__(self, name, address, timeout=20, **kwargs):
@@ -32,7 +123,9 @@ class DS4000(VisaInstrument):
               to accommodate large waveforms
         """
 
-        super().__init__(name, address, timeout=timeout, device_clear=False, **kwargs)
+        # Init VisaInstrument. device_clear MUST NOT be issued, otherwise communications hangs
+        # due a bug in firmware
+        super().__init__(name, address, timeout=timeout, **kwargs)  #device_clear=False, add when #752 is merged
         self.connect_message()
 
         # functions
@@ -64,7 +157,15 @@ class DS4000(VisaInstrument):
                            vals=vals.Enum('AUTO', 'NORM', 'SING')
                            )
 
-        :TRIGger: SWE
+        channels = ChannelList(self, "Channels", Rigol_DS4035_Channel, snapshotable=False)
+
+        for channel_number in range(1, 5):
+            channel = RigolDS4000Channel(self, "ch{}".format(channel_number), channel_number)
+            channels.append(channel)
+
+        channels.lock()
+        self.add_submodule('channels', channels)
+
         # self.add_parameter('trigger_source',
         #                    label='Source for the trigger',
         #                    get_cmd='TRIGger:MAIn:EDGE:SOURce?',
@@ -102,16 +203,6 @@ class DS4000(VisaInstrument):
         #                                   500e-6, 1e-3, 2.5e-3, 5e-3, 10e-3,
         #                                   25e-3, 50e-3, 100e-3, 250e-3, 500e-3,
         #                                   1, 2.5, 5, 10, 25, 50))
-
-
-
-
-    def _set_timescale(self, scale):
-        """
-        set_cmd for the horizontal_scale
-        """
-        self.trace_ready = False
-        self.write('HORizontal:SCAle {}'.format(scale))
 
 
     def get_waveform(self, ch = 1, raw=True, max_read_step=100):
