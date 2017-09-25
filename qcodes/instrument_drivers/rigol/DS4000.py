@@ -66,6 +66,9 @@ class ScopeArray(ArrayParameter):
 
             for _ in range(self.max_read_step):
                 status = self._instrument.ask(':WAVeform:STATus?').split(',')[0]
+
+                # Ask and retrive waveform data
+                # It uses .read_raw() to get a byte string since our data is binary
                 self._instrument.write(':WAVeform:DATA?')
                 data_bin += self._instrument._parent.visa_handle.read_raw()
 
@@ -76,6 +79,8 @@ class ScopeArray(ArrayParameter):
                 raise ValueError('Communication error')
 
         else:
+            # Ask and retrive waveform data
+            # It uses .read_raw() to get a byte string since our data is binary
             self._instrument.write(':WAVeform:DATA?')  # Query data
             data_bin += self._instrument._parent.visa_handle.read_raw()
 
@@ -114,11 +119,15 @@ class RigolDS4000Channel(InstrumentChannel):
                            set_cmd=":CHANnel{}:SCALe {}".format(channel, "{}"),
                            get_parser=float
                           )
+
+        # Return the waveform displayed on the screen
         self.add_parameter('curvedata',
                            channel=channel,
                            parameter_class=ScopeArray,
                            raw=False
                            )
+
+        # Return the waveform in the internal memory
         self.add_parameter('curvedata_raw',
                            channel=channel,
                            parameter_class=ScopeArray,
