@@ -30,10 +30,14 @@ class ZIHF2LI(_ZILI_generic):
     def __init__(self, name: str, device_ID: str, **kwargs) -> None:
         super().__init__(name, device_ID, api_level=1, **kwargs)
 
-        #TODO: Add check for MF option
         num_demod = 6
-        num_osc = 2
         out_map = {1:6, 2:7}
+
+        if 'MF' in self.props['options']:
+            num_osc = 6
+        else
+            num_osc = 2
+
         self._create_parameters(num_osc, num_demod, out_map)
 
 
