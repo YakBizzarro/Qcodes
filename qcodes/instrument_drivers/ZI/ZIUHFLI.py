@@ -1,5 +1,4 @@
 from .private.ZILI_generic import _ZILI_generic
-import enum
 from functools import partial
 
 from qcodes.utils import validators as vals
@@ -88,7 +87,7 @@ class ZIUHFLI(_ZILI_generic):
                                )
 
             sigindiffs = {'Off': 0, 'Inverted': 1, 'Input 1 - Input 2': 2,
-                          'Input 2 - Input 1': 3}         
+                          'Input 2 - Input 1': 3}
             param = getattr(self, f'signal_input{sigin}_diff')
             param.val_mapping = sigindiffs
             param.vals = vals.Enum(*list(sigindiffs.keys()))

@@ -1,6 +1,5 @@
 from .private.ZILI_generic import _ZILI_generic
 import enum
-from functools import partial
 
 from qcodes.utils import validators as vals
 
@@ -51,7 +50,7 @@ class ZIHF2LI(_ZILI_generic):
                         'Aux Input 1': 3,
                         'DIO 0': 4,
                         'DIO 1': 5}
-            
+
             param = getattr(self, f'demod{demod}_signalin')
             param.val_mapping = dmsigins
             param.vals = vals.Enum(*list(dmsigins.keys()))

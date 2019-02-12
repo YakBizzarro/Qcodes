@@ -676,7 +676,8 @@ class _ZILI_generic(Instrument):
 
         Args:
             name (str): The internal QCoDeS name of the instrument
-            device_ID (str): The device name as listed in the web server.
+            device_ID (str): The device name as listed in the web server, in the form 'devXXXX'
+            api_level (int): The required version of LabOne API version
         """
 
         super().__init__(name, **kwargs)
@@ -1689,7 +1690,7 @@ class _ZILI_generic(Instrument):
                           'offset': [update_range]
                          }
         if setbase in changing_param:
-            [f() for f in changing_param[setbase]]
+            _ = [f() for f in changing_param[setbase]]
 
     def _sigout_getter(self, number, mode, setting):
         """
