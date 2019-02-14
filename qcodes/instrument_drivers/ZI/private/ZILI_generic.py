@@ -9,8 +9,8 @@ from typing import Callable, List, Union, cast
 try:
     import zhinst.utils
 except ImportError:
-    raise ImportError('''Could not find Zurich Instruments Lab One software.
-                         Please refer to the Zi UHF-LI User Manual for
+    raise ImportError('''Could not find Zurich Instruments LabOne software.
+                         Please refer to the ZI User Manual for
                          download and installation instructions.
                       ''')
 
@@ -572,13 +572,7 @@ class Scope(MultiParameter):
 
 class _ZILI_generic(Instrument):
     """
-    QCoDeS driver for ZI UHF-LI.
-
-    Currently implementing demodulator settings and the sweeper functionality.
-
-    Requires ZI Lab One software to be installed on the computer running QCoDeS.
-    Furthermore, the Data Server and Web Server must be running and a connection
-    between the two must be made.
+    Abstract QCoDeS driver for ZI Lockins
 
     TODOs:
         * Add zoom-FFT

@@ -14,12 +14,17 @@ class ZIUHFLI(_ZILI_generic):
     Currently implementing demodulator settings and the sweeper functionality.
 
     Requires ZI Lab One software to be installed on the computer running QCoDeS.
-    Furthermore, the Data Server and Web Server must be running and a connection
-    between the two must be made.
-
     """
 
     def __init__(self, name: str, device_ID: str, **kwargs) -> None:
+        """
+        Create an instance of the instrument.
+
+        Args:
+            name (str): The internal QCoDeS name of the instrument
+            device_ID (str): The device name as listed in the web server, in the form 'devXXXX'
+        """
+
         super().__init__(name, device_ID, api_level=5, **kwargs)
 
         num_demod = 8

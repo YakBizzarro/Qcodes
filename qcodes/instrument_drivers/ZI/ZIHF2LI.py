@@ -11,12 +11,9 @@ class ZIHF2LI(_ZILI_generic):
     """
     QCoDeS driver for ZI HF2 Lockin.
 
-    Currently implementing demodulator settings and the sweeper functionality.
+    Currently implementing demodulator settings and AUXOutputs
 
-    Requires ZI Lab One software to be installed on the computer running QCoDeS.
-    Furthermore, the Data Server and Web Server must be running and a connection
-    between the two must be made.
-
+    Requires ZI LabOne software to be installed on the computer running QCoDeS.
     """
     class DemodTrigger(enum.IntFlag):
         CONTINUOUS = 0
