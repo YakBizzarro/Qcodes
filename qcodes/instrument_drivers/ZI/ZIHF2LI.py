@@ -1,4 +1,7 @@
 from .private.ZILI_generic import _ZILI_generic
+from .private.ZIHF2LI_AuxOutputChannel import ZIHF2LI_AuxOutputChannel
+from qcodes.instrument.channel import ChannelList
+
 import enum
 
 from qcodes.utils import validators as vals
@@ -83,3 +86,15 @@ class ZIHF2LI(_ZILI_generic):
 
             param = getattr(self, f'signal_output{sigout}_offset')
             param.vals = vals.Numbers(-1.0, 1.0)
+
+        ########################################
+        # AUX OUTPUTS
+        auxoutputchannels = ChannelList(self, "ZIHF2LI_AUXOutputChannel", ZIHF2LI_AUXOutputChannel,
+                               snapshotable=False)
+        for auxchannum in range(1,5):
+            name = 'aux_out{}'.format(auxchannum)
+            auxchannel = ZIHF2LI_AUXOutputChannel(self, name, auxchannum)
+            auxoutputchannels.append(auxchannel)
+            self.add_submodule(name, auxchannel)
+        auxoutputchannels.lock()
+        self.add_submodule('aux_out_channels', auxoutputchannels)

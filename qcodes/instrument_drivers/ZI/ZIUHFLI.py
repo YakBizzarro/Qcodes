@@ -1,4 +1,7 @@
 from .private.ZILI_generic import _ZILI_generic
+from .private.ZIUHFLI_AuxOutputChannel import ZIUHFLI_AuxOutputChannel
+from qcodes.instrument.channel import ChannelList
+
 from functools import partial
 
 from qcodes.utils import validators as vals
@@ -118,3 +121,15 @@ class ZIUHFLI(_ZILI_generic):
                                    sigout - 1, 0, 'autorange'),
                    val_mapping={'ON': 1, 'OFF': 0},
                    vals=vals.Enum('ON', 'OFF'))
+
+        ########################################
+        # AUX OUTPUTS
+        auxoutputchannels = ChannelList(self, "ZIUHFLI_AUXOutputChannel", ZIUHFLI_AUXOutputChannel,
+                               snapshotable=False)
+        for auxchannum in range(1,5):
+            name = 'aux_out{}'.format(auxchannum)
+            auxchannel = ZIUHFLI_AUXOutputChannel(self, name, auxchannum)
+            auxoutputchannels.append(auxchannel)
+            self.add_submodule(name, auxchannel)
+        auxoutputchannels.lock()
+        self.add_submodule('aux_out_channels', auxoutputchannels)
