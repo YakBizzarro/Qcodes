@@ -5,6 +5,7 @@ from functools import partial
 from math import sqrt, log10
 
 from typing import Callable, List, Union, cast
+from enum import Enum, auto
 
 try:
     import zhinst.utils
@@ -20,6 +21,11 @@ from qcodes.utils import validators as vals
 
 log = logging.getLogger(__name__)
 
+
+class ValueType(Enum):
+    INT = auto()
+    DOUBLE = auto()
+    SAMPLE = auto()
 
 class _ZILI_generic(Instrument):
     """
@@ -52,29 +58,25 @@ class _ZILI_generic(Instrument):
         ########################################
         # Oscillators
         for oscs in range(1,num_osc+1):
-            self.add_parameter('oscillator{}_freq'.format(oscs),
-                               label='Frequency of oscillator {}'.format(oscs),
+            self.add_parameter(f'oscillator{oscs}_freq',
+                               label=f'Frequency of oscillator {oscs}',
                                unit='Hz',
-                               set_cmd=partial(self._setter, 'oscs',
-                                                oscs-1, 1, 'freq'),
-                               get_cmd=partial(self._getter, 'oscs',
-                                                oscs-1, 1, 'freq'),
-                               vals=vals.Numbers(0, 600e6))
+                               set_cmd=self._setter('oscs', oscs, 'freq', ValueType.DOUBLE),
+                               get_cmd=self._getter('oscs', oscs, 'freq', ValueType.DOUBLE)
+                               )
 
         ########################################
         # DEMODULATOR PARAMETERS
 
         for demod in range(1, num_demod+1):
-            self.add_parameter('demod{}_order'.format(demod),
+            self.add_parameter(f'demod{demod}_order',
                                label='Filter order',
-                               get_cmd=partial(self._getter, 'demods',
-                                               demod-1, 0, 'order'),
-                               set_cmd=partial(self._setter, 'demods',
-                                               demod-1, 0, 'order'),
+                               get_cmd=self._getter('demods', demod, 'order', ValueType.INT),
+                               set_cmd=self._setter('demods', demod, 'order', ValueType.INT),
                                vals=vals.Ints(1, 8)
                                )
 
-            self.add_parameter('demod{}_harmonic'.format(demod),
+            self.add_parameter(f'demod{demod}_harmonic',
                                label=('Reference frequency multiplication' +
                                       ' factor'),
                                get_cmd=partial(self._getter, 'demods',
@@ -269,62 +271,61 @@ class _ZILI_generic(Instrument):
                                 val_mapping={'ON': 1, 'OFF': 0},
                                 vals=vals.Enum('ON', 'OFF') )
 
-    def _setter(self, module, number, mode, setting, value):
+    def _setter(self, module: str, number: int, setting: str, value_type: ValueType):
         """
         General function to set/send settings to the device.
 
         The module (e.g demodulator, input, output,..) number is counted in a
-        zero indexed fashion.
+        ONE indexed fashion.
+
+        This function return a function that do the correct setting.
 
         Args:
             module (str): The module (eg. demodulator, input, output, ..)
                 to set.
             number (int): Module's index
-            mode (bool): Indicating whether we are setting an int or double
             setting (str): The module's setting to set.
-            value (int/double): The value to set.
+            value_type (ValueType): The value type to set.
         """
 
-        setstr = '/{}/{}/{}/{}'.format(self.device, module, number, setting)
+        function_table = {
+            ValueType.INT: self.daq.setInt,
+            ValueType.DOUBLE: self.daq.setDouble,
+        }
+        set_function = function_table[value_type]
 
-        if mode == 0:
-            self.daq.setInt(setstr, value)
-        if mode == 1:
-            self.daq.setDouble(setstr, value)
+        setstr = f'/{self.device}/{module}/{number-1}/{setting}'
 
-    def _getter(self, module: str, number: int,
-                mode: int, setting: str) -> Union[float, int, str, dict]:
+        return partial(set_function, setstr)
+
+    def _getter(self, module: str, number: int, setting: str, value_type: ValueType):
         """
-        General get function for generic parameters. Note that some parameters
-        use more specialised setter/getters.
+        General function to get settings to the device.
 
         The module (e.g demodulator, input, output,..) number is counted in a
         zero indexed fashion.
 
+        This function return a function that return the correct setting.
+
         Args:
             module (str): The module (eg. demodulator, input, output, ..)
-                we want to know the value of.
+                to set.
             number (int): Module's index
-            mode (int): Indicating whether we are asking for an int or double.
-                0: Int, 1: double, 2: Sample
             setting (str): The module's setting to set.
-        returns:
-            inquered value
-
+            value_type (ValueType): The value type to set.
         """
 
-        querystr = '/{}/{}/{}/{}'.format(self.device, module, number, setting)
-        log.debug("getting %s", querystr)
-        if mode == 0:
-            value = self.daq.getInt(querystr)
-        elif mode == 1:
-            value = self.daq.getDouble(querystr)
-        elif mode == 2:
-            value = self.daq.getSample(querystr)
-        else:
-            raise RuntimeError("Invalid mode supplied")
-        # Weird exception, samplingrate returns a string
-        return value
+        function_table = {
+            ValueType.INT: self.daq.getInt,
+            ValueType.DOUBLE: self.daq.getDouble,
+            ValueType.SAMPLE: self.daq.getSample
+        }
+        get_function = function_table[value_type]
+
+        getstr = f'/{self.device}/{module}/{number-1}/{setting}'
+
+        return partial(get_function, getstr)
+
 
     def _get_demod_sample(self, number: int, demod_param: str) -> float:
         log.debug("getting demod %s param %s", number, demod_param)

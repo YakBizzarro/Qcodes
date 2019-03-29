@@ -26,6 +26,8 @@ class ZIHF2LI(_ZILI_generic):
         DIO1_HIGH = 64
         DIO1_LOW = 128
 
+#TODO: change oscillatore validator
+
 
     def __init__(self, name: str, device_ID: str, **kwargs) -> None:
         super().__init__(name, device_ID, api_level=1, **kwargs)
@@ -42,6 +44,12 @@ class ZIHF2LI(_ZILI_generic):
 
 
         #Create HF2LI specific parameters
+
+        ########################################
+        # Oscillators
+        for oscs in range(1,num_osc+1):
+            param = getattr(self, f'oscillator{oscs}_freq')
+            param.vals = vals.Numbers(0, 50e6)
 
         ########################################
         # DEMODULATOR PARAMETERS

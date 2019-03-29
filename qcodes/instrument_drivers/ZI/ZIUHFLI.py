@@ -39,6 +39,12 @@ class ZIUHFLI(_ZILI_generic):
 
 
         #Create UHFLI specific parameters
+        ########################################
+        # Oscillators
+        for oscs in range(1,num_osc+1):
+            param = getattr(self, f'oscillator{oscs}_freq')
+            param.vals = vals.Numbers(0, 600e6)
+
 
         ########################################
         # DEMODULATOR PARAMETERS
